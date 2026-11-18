@@ -12,6 +12,8 @@ export interface SantoCancaoNova {
   resumo: string;
   /** Outros santos e beatos do dia (frases curtas do Martirológio, em texto simples). */
   outros: string[];
+  /** O texto completo da publicação, em blocos (página de Liturgia). */
+  conteudo: BlocoTexto[];
   link: string;
   /** Dia e mês (1 a 12) que a página da Canção Nova diz estar mostrando. */
   dia: number;
@@ -94,6 +96,39 @@ function imagemSegura(url: string | undefined): string | null {
   }
 }
 
+/** Um pedaço do texto completo: título de seção, intertítulo em negrito, parágrafo ou lista. */
+export type BlocoTexto =
+  | { tipo: 'titulo' | 'subtitulo' | 'p'; texto: string }
+  | { tipo: 'lista'; itens: string[] };
+
+/**
+ * O texto inteiro da publicação, como blocos simples (nunca HTML de fora): é o que a
+ * página de Liturgia mostra. Parágrafos só com imagem somem; "Rótulo<br>texto" vira
+ * intertítulo + parágrafo.
+ */
+export function extrairConteudo(corpo: string): BlocoTexto[] {
+  const blocos: BlocoTexto[] = [];
+  for (const m of corpo.matchAll(/<(h[1-6]|p|ul|ol)\b[^>]*>([^]*?)<\/\1>/gi)) {
+    const marca = m[1].toLowerCase();
+    const interior = m[2];
+    if (marca === 'ul' || marca === 'ol') {
+      const itens = Array.from(interior.matchAll(/<li[^>]*>([^]*?)<\/li>/gi), (li) => textoPuro(li[1])).filter(Boolean);
+      // Os botões de compartilhar também são listas: ficam de fora.
+      if (itens.length && !itens.every((i) => /^compartilhe/i.test(i))) blocos.push({ tipo: 'lista', itens });
+    } else if (marca === 'p') {
+      const rotulo = interior.match(/^\s*<b>([^<]{1,70})<\/b>(?=(?:\s|<[^>]*>){0,3}<br)/i);
+      const resto = rotulo ? interior.slice(rotulo[0].length) : interior;
+      if (rotulo && textoPuro(rotulo[1])) blocos.push({ tipo: 'subtitulo', texto: textoPuro(rotulo[1]) });
+      const texto = textoPuro(resto);
+      if (texto.length > 1) blocos.push({ tipo: texto.length <= 70 && /^<b>/i.test(resto.trim()) && !rotulo ? 'subtitulo' : 'p', texto });
+    } else {
+      const texto = textoPuro(interior);
+      if (texto) blocos.push({ tipo: 'titulo', texto });
+    }
+  }
+  return blocos;
+}
+
 /** Lê a página inicial do santo.cancaonova.com e devolve o santo do dia, ou null se a estrutura mudou. */
 export function extrairSanto(html: string): SantoCancaoNova | null {
   const titulo = html.match(/<h1[^>]*class=["'][^"']*entry-title[^"']*["'][^>]*>([^]*?)<\/h1>/i);
@@ -126,7 +161,23 @@ export function extrairSanto(html: string): SantoCancaoNova | null {
         .slice(0, 8)
     : [];
 
+  // O texto inteiro (até o fim do artigo, com a lista de outros santos e as fontes).
+  let completo = html.slice(inicio);
+  completo = completo.slice(completo.indexOf('</ul>') + 5);
+  const fimCompleto = completo.search(/<\/article>/i);
+  if (fimCompleto > 0) completo = completo.slice(0, fimCompleto);
+  const conteudo = extrairConteudo(completo);
+
   const og = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
   const primeiraImg = corpo.match(/<img[^>]*\bsrc=["']([^"']+)["']/i);
-  return { nome, imagem: imagemSegura(og?.[1]) ?? imagemSegura(primeiraImg?.[1]), resumo, outros, link: URL_SANTO_CANCAONOVA, dia, mes };
+  return {
+    nome,
+    imagem: imagemSegura(og?.[1]) ?? imagemSegura(primeiraImg?.[1]),
+    resumo,
+    outros,
+    conteudo,
+    link: URL_SANTO_CANCAONOVA,
+    dia,
+    mes,
+  };
 }

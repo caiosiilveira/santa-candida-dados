@@ -26,13 +26,21 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const [ano, mes, dia] = hoje.split('-').map(Number);
 
-async function baixar(url) {
-  const r = await fetch(url, {
-    headers: { 'User-Agent': 'SiteParoquiaSantaCandida/1.0 (santo do dia; poucos pedidos por dia)', Accept: 'text/html' },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status} em ${url}`);
-  return r.text();
+// Até 3 tentativas: uma falha de rede passageira não pode custar o santo do dia.
+async function baixar(url, tentativas = 3) {
+  for (let n = 1; ; n++) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'SiteParoquiaSantaCandida/1.0 (santo do dia; poucos pedidos por dia)', Accept: 'text/html' },
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status} em ${url}`);
+      return await r.text();
+    } catch (e) {
+      if (n >= tentativas) throw e;
+      await espera(3000 * n);
+    }
+  }
 }
 
 // ---- Canção Nova ----
@@ -67,8 +75,8 @@ if (existsSync(arquivoIndice)) {
 if (!cn && paulus.length === 0) throw new Error('Nenhuma fonte respondeu com o santo de hoje: nada foi gravado.');
 
 const principal = cn
-  ? { fonte: { nome: 'Canção Nova', url: cn.link }, nome: cn.nome, imagem: cn.imagem, resumo: cn.resumo, outros: cn.outros, link: cn.link }
-  : { fonte: { nome: 'Paulus Editora', url: paulus[0].link }, nome: paulus[0].nome, imagem: paulus[0].imagem, resumo: paulus[0].resumo, outros: [], link: paulus[0].link };
+  ? { fonte: { nome: 'Canção Nova', url: cn.link }, nome: cn.nome, imagem: cn.imagem, resumo: cn.resumo, outros: cn.outros, conteudo: cn.conteudo, link: cn.link }
+  : { fonte: { nome: 'Paulus Editora', url: paulus[0].link }, nome: paulus[0].nome, imagem: paulus[0].imagem, resumo: paulus[0].resumo, outros: [], conteudo: [], link: paulus[0].link };
 
 mkdirSync(saida, { recursive: true });
 const dados = { dataISO: hoje, ano, ...principal, paulus: cn ? paulus : paulus.slice(1) };
