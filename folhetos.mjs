@@ -1,8 +1,9 @@
 // Robô do Folheto Povo de Deus: lê a lista de folhetos da Arquidiocese de São Paulo
 // (robo/lib/arquisp.ts) e grava folhetos.json, com a data, a celebração e os links dos PDFs
-// do folheto e das partituras. Roda junto com o santo do dia (.github/workflows/santo-do-dia.yml).
-// Se a página falhar ou vier sem folhetos, sai com erro sem gravar nada (o workflow mantém o
-// arquivo anterior).
+// do folheto e das partituras. Roda uma vez por mês, junto com o índice de santos
+// (.github/workflows/indice-santos.yml), e o arquivo fica guardado no repositório; o robô
+// diário só o leva para a branch dados. Se a página falhar ou vier sem folhetos, sai com
+// erro sem gravar nada (fica a lista do mês anterior).
 //
 // Uso: node robo/folhetos.mjs [pasta-de-saida=public/dados]
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -16,7 +17,7 @@ async function baixar(url, tentativas = 3) {
   for (let n = 1; ; n++) {
     try {
       const r = await fetch(url, {
-        headers: { 'User-Agent': 'SiteParoquiaSantaCandida/1.0 (folheto Povo de Deus; um pedido por dia)', Accept: 'text/html' },
+        headers: { 'User-Agent': 'SiteParoquiaSantaCandida/1.0 (folheto Povo de Deus; um pedido por mes)', Accept: 'text/html' },
         signal: AbortSignal.timeout(20000),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status} em ${url}`);

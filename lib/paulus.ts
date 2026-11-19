@@ -13,6 +13,8 @@ export const URL_LISTA_PAULUS = 'https://www.paulus.com.br/portal/santo/';
 export interface ItemIndice {
   nome: string;
   link: string;
+  /** Miniatura da lista (180×180 ou 150×150), no site da Paulus; null se não houver. */
+  imagem?: string | null;
 }
 
 /** "MM-DD" → santos daquele dia. */
@@ -63,6 +65,14 @@ export function ultimaPagina(html: string): number {
   return numeros.length ? Math.max(...numeros) : 1;
 }
 
+/** A miniatura do santo na lista: a de 180 px do srcset, senão a do src (150 px). */
+function miniatura(bloco: string): string | null {
+  const img = bloco.match(/<img[^>]*wp-post-image[^>]*>/)?.[0];
+  if (!img) return null;
+  const de180 = img.match(/srcset="[^"]*?(https:[^\s"]+-180x180\.(?:jpe?g|png|webp))\s+180w/i)?.[1];
+  return imagemSegura(de180 ?? img.match(/\ssrc="([^"]+)"/)?.[1]);
+}
+
 /** Itens de uma página da lista: nome, link e a data (dia e mês) de publicação. */
 export function extrairLista(html: string): ItemLista[] {
   const itens: ItemLista[] = [];
@@ -72,7 +82,7 @@ export function extrairLista(html: string): ItemLista[] {
     const link = linkSeguro(titulo?.[1]);
     if (!data || !titulo || !link) continue;
     const nome = textoPuro(titulo[2]);
-    if (nome) itens.push({ nome, link, dia: Number(data[1]), mes: Number(data[2]) });
+    if (nome) itens.push({ nome, link, imagem: miniatura(bloco), dia: Number(data[1]), mes: Number(data[2]) });
   }
   return itens;
 }
@@ -80,11 +90,11 @@ export function extrairLista(html: string): ItemLista[] {
 /** Junta as páginas da lista no índice por dia, sem repetir a mesma página. */
 export function montarIndice(itens: ItemLista[]): Indice {
   const indice: Indice = {};
-  for (const { dia, mes, nome, link } of itens) {
+  for (const { dia, mes, nome, link, imagem } of itens) {
     if (dia < 1 || dia > 31 || mes < 1 || mes > 12) continue;
     const chave = chaveDia(dia, mes);
     const lista = (indice[chave] ??= []);
-    if (!lista.some((i) => i.link === link)) lista.push({ nome, link });
+    if (!lista.some((i) => i.link === link)) lista.push({ nome, link, imagem: imagem ?? null });
   }
   return Object.fromEntries(Object.entries(indice).sort(([a], [b]) => a.localeCompare(b)));
 }

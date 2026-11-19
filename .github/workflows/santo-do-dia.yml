@@ -1,5 +1,5 @@
 # Santo do dia: uma vez por dia (e de novo mais tarde, caso a Canção Nova atrase), lê
-# o santo da Canção Nova, a publicação da Paulus e a lista do Folheto Povo de Deus e publica arquivos pequenos na
+# o santo da Canção Nova e a publicação da Paulus e publica arquivos pequenos na
 # branch "dados". O site lê esses arquivos direto do GitHub: nada roda nem fica
 # guardado na Cloudflare. Horários em UTC (São Paulo = UTC-3).
 name: Santo do dia
@@ -28,9 +28,10 @@ jobs:
           node-version: 24
       - name: Ler o santo do dia
         run: node santo-do-dia.mjs saida
-      - name: Ler os folhetos Povo de Deus
-        # Se a Arquidiocese falhar, mantém o arquivo de ontem (a branch é recriada a cada vez).
-        run: node folhetos.mjs saida || curl -sf -o saida/folhetos.json "https://raw.githubusercontent.com/${{ github.repository }}/dados/folhetos.json" || true
+      - name: Copiar a lista de folhetos
+        # A lista do Folheto Povo de Deus é lida uma vez por mês (indice-santos.yml) e fica
+        # guardada no repositório; aqui só vai junto para a branch dados.
+        run: cp folhetos.json saida/ 2>/dev/null || true
       - name: Publicar na branch dados
         # Uma branch só com os arquivos, recriada a cada vez: o repositório não cresce.
         run: |

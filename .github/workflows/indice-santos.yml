@@ -1,6 +1,8 @@
-# Índice dos santos da Paulus (dia → santos e a página de cada um): uma vez por mês,
-# relê a lista e, se mudou, guarda o novo indice-santos.json no próprio repositório.
-# O robô diário usa esse arquivo para achar a publicação de cada dia.
+# Uma vez por mês: o índice dos santos da Paulus (dia → santos, a página e a miniatura de
+# cada um) e a lista do Folheto Povo de Deus da Arquidiocese (data → PDFs do folheto e das
+# partituras). O que mudar é guardado no próprio repositório; o robô diário leva os dois
+# arquivos para a branch dados. A Arquidiocese publica os folhetos com meses de
+# antecedência, então uma leitura por mês cobre a lista.
 name: Índice de santos
 
 on:
@@ -25,9 +27,12 @@ jobs:
           node-version: 24
       - name: Ler a lista da Paulus
         run: node indice-santos.mjs
+      - name: Ler a lista do Folheto Povo de Deus
+        # Se a Arquidiocese falhar, fica a lista do mês anterior.
+        run: node folhetos.mjs . || true
       - name: Guardar se mudou
         run: |
           git config user.name "Robô do índice de santos"
           git config user.email "actions@users.noreply.github.com"
-          git add indice-santos.json
-          git diff --cached --quiet || (git commit -q -m "Índice de santos atualizado" && git push -q)
+          git add indice-santos.json folhetos.json
+          git diff --cached --quiet || (git commit -q -m "Índice de santos e folhetos atualizados" && git push -q)
